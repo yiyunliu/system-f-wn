@@ -11,6 +11,7 @@ Unset Printing Implicit Defensive.
 
 Definition context n m := fin n -> ty m.
 
+(* Statics *)
 Inductive Wt {n m} (Γ : context n m) : tm n m -> ty m -> Prop :=
 | T_Var i :
   (* ----------- *)
@@ -188,4 +189,54 @@ Proof.
     eauto using is_morphing_tlam_ext.
   - move => * /=.
     apply : T_TApp'; eauto; by asimpl.
+Qed.
+
+Lemma Wt_subst_tm {n m} a b A B
+  (Γ : context n m)
+  (h0 : Wt (A .: Γ) a B)
+  (h1 : Wt Γ b A) :
+  Wt Γ (subst_tm (b..) ids a) B.
+Proof.
+  replace B with (subst_ty ids B); last by asimpl.
+  apply morphing with (Γ := A .: Γ) (ξ0 := b..) (ξ1 := ids); first done.
+  rewrite /is_morphing.
+  destruct i as [i|].
+  - apply T_Var'; by asimpl.
+  - simpl; asimpl; done.
+Qed.
+
+Lemma Wt_subst_ty {n m} a A (B : ty m)
+  (Γ : context n m)
+  (h0 : Wt (Γ >> ren_ty shift) a A) :
+  Wt Γ (subst_tm ids (B..) a) (subst_ty (B..) A).
+Proof.
+  apply : morphing; first by eassumption.
+  move => i /=.
+  apply T_Var'; by asimpl.
+Qed.
+
+(* Dynamics *)
+Inductive Red {n m} : tm n m -> tm n m -> Prop :=
+| R_App a0 a1 b :
+  Red a0 a1 ->
+  Red (App a0 b) (App a1 b)
+| R_AppAbs A a b :
+  Red (App (Lam A a) b) (subst_tm (b..) ids a)
+| R_TApp a b A :
+  Red a b ->
+  Red (TApp a A) (TApp b A)
+| R_TAppAbs a A :
+  Red (TApp (TLam a) A) (subst_tm ids (A..) a).
+
+Lemma preservation {n m} (Γ : context n m) a b A
+  (h : Red a b) :
+  Wt Γ a A ->
+  Wt Γ b A.
+Proof.
+  move : Γ A.
+  elim : a b / h.
+  - hauto lq:on inv:Wt ctrs:Wt.
+  - hauto lq:on use:Wt_subst_tm inv:Wt.
+  - hauto lq:on inv:Wt ctrs:Wt.
+  - hauto lq:on use:Wt_subst_ty ctrs:Wt inv:Wt.
 Qed.
