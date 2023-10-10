@@ -262,5 +262,15 @@ Fixpoint I {m} (A : ty m) (δ : ty_assn m)
 
 Definition tm_assn m := fin m -> tm 0 0.
 
-Definition tm_assn_ok {m} (γ : tm_assn m) (η : candidate_assn m) :=
-  forall i, (η i) (γ i).
+Definition tm_assn_ok {n m} (γ : tm_assn n) (Γ : context n m) (δ : ty_assn m) (η : candidate_assn m) :=
+  forall (i : fin n), I (Γ i) δ η (γ i).
+
+Definition SemWt {n m} (Γ : context n m) (a : tm n m) (A : ty m) :=
+  forall γ δ η, tm_assn_ok γ Γ δ η -> candidate_assn_ok δ η -> I A δ η (subst_tm γ δ a).
+
+Lemma fundamental_lemma {n m} (Γ : context n m) (a : tm n m) (A : ty m)
+  (h : Wt Γ a A) : SemWt Γ a A.
+Proof.
+  elim : n m Γ a A / h.
+  - sfirstorder unfold:SemWt, candidate_assn_ok, tm_assn_ok.
+Admitted.
