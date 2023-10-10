@@ -428,3 +428,16 @@ Proof.
     hauto lq:on inv:option.
   - sfirstorder.
 Qed.
+
+Lemma termination (a : tm 0 0) (h : Wt null a Unit) : Reds a unit.
+Proof.
+  have h0 : SemWt null a Unit by hauto lq:on use:fundamental_lemma.
+  rewrite /SemWt in h0.
+  specialize (h0 ids).
+  specialize (h0 ids).
+  specialize (h0 null).
+  move /(_ ltac:(hauto lq:on unfold:tm_assn_ok inv:option)
+                  ltac:(hauto lq:on unfold:candidate_assn_ok inv:option)) in h0.
+  asimpl in h0.
+  sfirstorder.
+Qed.
