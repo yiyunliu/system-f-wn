@@ -256,7 +256,7 @@ Fixpoint I {m} (A : ty m) (δ : ty_assn m)
   (η : candidate_assn m) (a : tm 0 0) : Prop :=
   match A with
   | var_ty i => η i a
-  | Fun A B => forall b, I A δ η b -> I B δ η (App b a)
+  | Fun A B => forall b, I A δ η b -> I B δ η (App a b)
   | Forall A => forall B P, candidate B P -> I A (B .: δ) (P .: η) (TApp a B)
   end.
 
@@ -273,4 +273,6 @@ Lemma fundamental_lemma {n m} (Γ : context n m) (a : tm n m) (A : ty m)
 Proof.
   elim : n m Γ a A / h.
   - sfirstorder unfold:SemWt, candidate_assn_ok, tm_assn_ok.
+  - admit.
+  - hauto l:on unfold:SemWt, candidate_assn_ok, tm_assn_ok.
 Admitted.
