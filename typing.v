@@ -303,21 +303,58 @@ Proof.
   - sfirstorder.
 Qed.
 
-Lemma I_renaming {m} (A : ty m)
+Lemma I_weakening_iff {m} (A : ty m)
+  (η : candidate_assn m) (a : tm 0 0)
+  (P : tm 0 0 -> Prop) (h : candidate P) :
+  I A η a <-> I (ren_ty shift A) (P .: η) a.
+Proof. by apply I_renaming_iff. Qed.
+
+(* Lemma I_renaming {m} (A : ty m) *)
+(*   (η0 : candidate_assn m) (a : tm 0 0) : *)
+(*   forall n (η1 : candidate_assn n) *)
+(*     (ξ : fin m -> fin n), *)
+(*     (forall i, η0 i = η1 (ξ i)) -> *)
+(*     I A η0 a -> I (ren_ty ξ A) η1 a. *)
+(* Proof. hauto l:on use:I_renaming_iff. Qed. *)
+
+Lemma I_morphing {m} (A : ty m)
   (η0 : candidate_assn m) (a : tm 0 0) :
   forall n (η1 : candidate_assn n)
-    (ξ : fin m -> fin n),
-    (forall i, η0 i = η1 (ξ i)) ->
-    I A η0 a -> I (ren_ty ξ A) η1 a.
-Proof. hauto l:on use:I_renaming_iff. Qed.
+    (ξ : fin m -> ty n),
+    (forall (i : fin m), forall b, η0 i b <-> I (ξ i) η1 b) ->
+    I A η0 a <-> I (subst_ty ξ A) η1 a.
+Proof.
+  move : η0 a.
+  elim : m / A.
+  - sfirstorder.
+  - hauto l:on.
+  - move => n A ihA η0 a m η1 ξ ih0.
+    split.
+    + move => /= h B P hP.
+      rewrite -ihA; eauto.
+      destruct i as [i|].
+      * simpl.
+        asimpl.
+        move => b.
+        rewrite -I_weakening_iff; eauto.
+      * done.
+    + move => /= h B P hP.
+      rewrite ihA; eauto.
+      destruct i as [i|].
+      * simpl.
+        asimpl.
+        move => b.
+        rewrite -I_weakening_iff; eauto.
+      * done.
+  - sfirstorder.
+Qed.
 
 Lemma I_backward_clos {m} (η : candidate_assn m) A a :
   candidate_assn_ok η ->
   I A η a ->
   forall b, Red b a -> I A η b.
 Proof.
-  move : η a.
-  elim : A.
+  elim : A η a.
   - sfirstorder.
   - hauto q:on ctrs:Red.
   - hauto ctrs:Red l:on inv:option unfold:candidate_assn_ok.
@@ -361,7 +398,7 @@ Proof.
   move => hP hγ.
   rewrite /tm_assn_ok => i.
   asimpl.
-  apply I_renaming with (η0 := η); eauto.
+  by apply I_weakening_iff.
 Qed.
 
 Definition SemWt {n m} (Γ : context n m) (a : tm n m) (A : ty m) :=
@@ -395,6 +432,7 @@ Proof.
     move => γ δ η h_γ_ok h_η_ok /=.
     move /(_ γ δ η h_γ_ok h_η_ok) => /= in ih0.
     move /(_ (subst_ty δ B) (I B η) ltac:(hauto l:on use:I_candidate)) in ih0.
-    admit.
+    rewrite -I_morphing; eauto.
+    hauto lq:on inv:option.
   - sfirstorder.
-Admitted.
+Qed.
