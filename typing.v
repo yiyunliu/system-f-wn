@@ -1,5 +1,5 @@
 From Coq Require Import ssreflect ssrfun ssrbool.
-From Hammer Require Import Tactics.
+From Hammer Require Import Tactics Hammer.
 From Coq Require Import
   micromega.Lia Relation_Operators Operators_Properties.
 From WR Require Export syntax.
@@ -36,7 +36,11 @@ Inductive Wt {n m} (Γ : context n m) : tm n m -> ty m -> Prop :=
 | T_TApp a A B :
   Wt Γ a (Forall A) ->
   (* ------------------------------ *)
-  Wt Γ (TApp a B) (subst_ty (B..) A).
+  Wt Γ (TApp a B) (subst_ty (B..) A)
+
+| T_Unit :
+  (* ---------------------- *)
+  Wt Γ unit Unit.
 
 #[export]Hint Constructors Wt : core.
 
@@ -106,6 +110,7 @@ Proof.
   - move => * /=.
     apply : T_TApp'; eauto.
     by asimpl.
+  - sfirstorder.
 Qed.
 
 Lemma weakening_tm {n m} a A
@@ -189,6 +194,7 @@ Proof.
     eauto using is_morphing_tlam_ext.
   - move => * /=.
     apply : T_TApp'; eauto; by asimpl.
+  - sfirstorder.
 Qed.
 
 Lemma Wt_subst_tm {n m} a b A B
@@ -228,6 +234,18 @@ Inductive Red {n m} : tm n m -> tm n m -> Prop :=
 | R_TAppAbs a A :
   Red (TApp (TLam a) A) (subst_tm ids (A..) a).
 
+#[export]Hint Constructors Red : core.
+
+Lemma R_AppAbs' {n m} (A : ty m) (a : tm (S n) m) b0 b :
+  b0 = subst_tm (b..) ids a ->
+  Red (App (Lam A a) b) b0.
+Proof. hauto lq:on ctrs:Red. Qed.
+
+Lemma R_TAppAbs' {n m} (a : tm n (S m)) A b :
+  b = (subst_tm ids (A..) a) ->
+  Red (TApp (TLam a) A) b.
+Proof. hauto lq:on ctrs:Red. Qed.
+
 Lemma preservation {n m} (Γ : context n m) a b A
   (h : Red a b) :
   Wt Γ a A ->
@@ -241,38 +259,142 @@ Proof.
   - hauto lq:on use:Wt_subst_ty ctrs:Wt inv:Wt.
 Qed.
 
-Definition candidate (A : ty 0) (P : tm 0 0 -> Prop) : Prop :=
-  (forall a, P a -> Wt null a A) /\
+Definition candidate (P : tm 0 0 -> Prop) : Prop :=
   forall a b, Red a b -> P b -> P a.
 
 Definition candidate_assn m := fin m -> tm 0 0 -> Prop.
 
 Definition ty_assn m := fin m -> ty 0.
 
-Definition candidate_assn_ok {m} (δ : ty_assn m) (η : candidate_assn m) :=
-  forall i, candidate (δ i) (η i).
+Definition candidate_assn_ok {m} (η : candidate_assn m) :=
+  forall i, candidate (η i).
 
-Fixpoint I {m} (A : ty m) (δ : ty_assn m)
+Definition Reds {n m} := clos_refl_trans_1n (tm n m) Red.
+
+Fixpoint I {m} (A : ty m)
   (η : candidate_assn m) (a : tm 0 0) : Prop :=
   match A with
+  | Unit => Reds a unit
   | var_ty i => η i a
-  | Fun A B => forall b, I A δ η b -> I B δ η (App a b)
-  | Forall A => forall B P, candidate B P -> I A (B .: δ) (P .: η) (TApp a B)
+  | Fun A B => forall b, I A η b -> I B η (App a b)
+  | Forall A => forall B P, candidate P -> I A (P .: η) (TApp a B)
   end.
+
+Lemma I_renaming_iff {m} (A : ty m)
+  (η0 : candidate_assn m) (a : tm 0 0) :
+  forall n (η1 : candidate_assn n)
+    (ξ : fin m -> fin n),
+    (forall i, η0 i = η1 (ξ i)) ->
+    I A η0 a <-> I (ren_ty ξ A) η1 a.
+Proof.
+  move : η0 a.
+  elim : m / A.
+  - qauto l:on.
+  - hauto q:on.
+  - move => n A ih0 η0 a m η1 ξ hξ.
+    split.
+    (* Should factor this part out *)
+    + move => /= h0 B P hP.
+      rewrite -ih0; eauto.
+      hauto q:on inv:option.
+    + move => /= h0 B P hP.
+      rewrite ih0; eauto.
+      hauto q:on inv:option.
+  - sfirstorder.
+Qed.
+
+Lemma I_renaming {m} (A : ty m)
+  (η0 : candidate_assn m) (a : tm 0 0) :
+  forall n (η1 : candidate_assn n)
+    (ξ : fin m -> fin n),
+    (forall i, η0 i = η1 (ξ i)) ->
+    I A η0 a -> I (ren_ty ξ A) η1 a.
+Proof. hauto l:on use:I_renaming_iff. Qed.
+
+Lemma I_backward_clos {m} (η : candidate_assn m) A a :
+  candidate_assn_ok η ->
+  I A η a ->
+  forall b, Red b a -> I A η b.
+Proof.
+  move : η a.
+  elim : A.
+  - sfirstorder.
+  - hauto q:on ctrs:Red.
+  - hauto ctrs:Red l:on inv:option unfold:candidate_assn_ok.
+  - hauto lq:on ctrs:Red, clos_refl_trans_1n.
+Qed.
+
+Lemma I_backward_clos' {m} (η : candidate_assn m) A a :
+  candidate_assn_ok η ->
+  I A η a ->
+  forall b, Reds b a -> I A η b.
+Proof.
+  move => ? ? ?.
+  induction 1; hauto l:on use:I_backward_clos.
+Qed.
+
+Lemma I_candidate {m} (η : candidate_assn m) A :
+  candidate_assn_ok η ->
+  candidate (I A η).
+Proof.
+  sauto lq:on use:I_backward_clos' unfold:candidate.
+Qed.
 
 Definition tm_assn m := fin m -> tm 0 0.
 
-Definition tm_assn_ok {n m} (γ : tm_assn n) (Γ : context n m) (δ : ty_assn m) (η : candidate_assn m) :=
-  forall (i : fin n), I (Γ i) δ η (γ i).
+Definition tm_assn_ok {n m} (γ : tm_assn n) (Γ : context n m) (η : candidate_assn m) :=
+  forall (i : fin n), I (Γ i) η (γ i).
+
+Lemma tm_assn_ok_cons {n m} (γ : tm_assn n) (Γ : context n m) (η : candidate_assn m)
+  (a : tm 0 0) (A : ty m) :
+  I A η a ->
+  tm_assn_ok γ Γ η ->
+  tm_assn_ok (a .: γ) (A .: Γ) η.
+Proof. hauto l:on inv:option unfold:tm_assn, tm_assn_ok. Qed.
+
+Lemma tm_assn_ok_cons_ty {n m} (γ : tm_assn n) (Γ : context n m) (η : candidate_assn m)
+  (a : tm 0 0) (P : tm 0 0 -> Prop) :
+  candidate P ->
+  tm_assn_ok γ Γ η ->
+  tm_assn_ok γ (Γ >> ren_ty shift) (P .: η).
+Proof.
+  move => hP hγ.
+  rewrite /tm_assn_ok => i.
+  asimpl.
+  apply I_renaming with (η0 := η); eauto.
+Qed.
 
 Definition SemWt {n m} (Γ : context n m) (a : tm n m) (A : ty m) :=
-  forall γ δ η, tm_assn_ok γ Γ δ η -> candidate_assn_ok δ η -> I A δ η (subst_tm γ δ a).
+  forall γ δ η, tm_assn_ok γ Γ η -> candidate_assn_ok η -> I A η (subst_tm γ δ a).
 
 Lemma fundamental_lemma {n m} (Γ : context n m) (a : tm n m) (A : ty m)
   (h : Wt Γ a A) : SemWt Γ a A.
 Proof.
   elim : n m Γ a A / h.
   - sfirstorder unfold:SemWt, candidate_assn_ok, tm_assn_ok.
-  - admit.
+  - rewrite /SemWt.
+    move => n m Γ A a B h0 ih0 γ δ η hγ hη.
+    simpl.
+    move => b hb.
+    move /(_ (b .: γ) δ η ltac:(hauto l:on use:tm_assn_ok_cons) ltac:(done)) in ih0.
+    apply : I_backward_clos; eauto.
+    apply R_AppAbs'; by asimpl.
   - hauto l:on unfold:SemWt, candidate_assn_ok, tm_assn_ok.
+  - rewrite /SemWt.
+    move => n m Γ a A h0 h1 γ δ η hγ hη.
+    simpl.
+    move => B P hP.
+    move /(_ γ (B .: δ) (P .: η)
+             ltac:(qauto l:on use:tm_assn_ok_cons_ty)
+                    ltac:(sauto unfold:candidate_assn_ok)) in h1.
+    apply : I_backward_clos; eauto.
+    hauto lq:on inv:option unfold:candidate_assn_ok.
+    apply R_TAppAbs'; by asimpl.
+  - move => n m Γ a A B h0 ih0.
+    rewrite /SemWt in ih0 *.
+    move => γ δ η h_γ_ok h_η_ok /=.
+    move /(_ γ δ η h_γ_ok h_η_ok) => /= in ih0.
+    move /(_ (subst_ty δ B) (I B η) ltac:(hauto l:on use:I_candidate)) in ih0.
+    admit.
+  - sfirstorder.
 Admitted.
