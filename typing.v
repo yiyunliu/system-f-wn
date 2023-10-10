@@ -309,14 +309,6 @@ Lemma I_weakening_iff {m} (A : ty m)
   I A η a <-> I (ren_ty shift A) (P .: η) a.
 Proof. by apply I_renaming_iff. Qed.
 
-(* Lemma I_renaming {m} (A : ty m) *)
-(*   (η0 : candidate_assn m) (a : tm 0 0) : *)
-(*   forall n (η1 : candidate_assn n) *)
-(*     (ξ : fin m -> fin n), *)
-(*     (forall i, η0 i = η1 (ξ i)) -> *)
-(*     I A η0 a -> I (ren_ty ξ A) η1 a. *)
-(* Proof. hauto l:on use:I_renaming_iff. Qed. *)
-
 Lemma I_morphing {m} (A : ty m)
   (η0 : candidate_assn m) (a : tm 0 0) :
   forall n (η1 : candidate_assn n)
