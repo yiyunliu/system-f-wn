@@ -5,7 +5,7 @@ Some differences from the notes:
 - Instead of boolean, the unit type is used as the base type for stating the termination property.
 - Binders are represented using well-scoped DeBruijn representation through [Autosubst 2](https://github.com/uds-psl/autosubst2).
 - Renaming and substitution properties for both syntactic and semantic typing are formulated in the general form of simultaneous substitution/renaming.
-- The definition of a candidate (`candidate`) is independent of the choice of types. Type assignment ($\delta$) is carried around in the interpretation function `I` so the terms remain closed.
+- The definition of a candidate (`candidate`) is independent of the choice of types or the type assignment ($\delta$). The type assignment is only used to close over an open term to define semantic typing.
 
 ## Dependencies
 To build the project, you need to have the following opam packages installed:
