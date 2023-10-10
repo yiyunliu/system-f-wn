@@ -240,3 +240,27 @@ Proof.
   - hauto lq:on inv:Wt ctrs:Wt.
   - hauto lq:on use:Wt_subst_ty ctrs:Wt inv:Wt.
 Qed.
+
+Definition candidate (A : ty 0) (P : tm 0 0 -> Prop) : Prop :=
+  (forall a, P a -> Wt null a A) /\
+  forall a b, Red a b -> P b -> P a.
+
+Definition candidate_assn m := fin m -> tm 0 0 -> Prop.
+
+Definition ty_assn m := fin m -> ty 0.
+
+Definition candidate_assn_ok {m} (δ : ty_assn m) (η : candidate_assn m) :=
+  forall i, candidate (δ i) (η i).
+
+Fixpoint I {m} (A : ty m) (δ : ty_assn m)
+  (η : candidate_assn m) (a : tm 0 0) : Prop :=
+  match A with
+  | var_ty i => η i a
+  | Fun A B => forall b, I A δ η b -> I B δ η (App b a)
+  | Forall A => forall B P, candidate B P -> I A (B .: δ) (P .: η) (TApp a B)
+  end.
+
+Definition tm_assn m := fin m -> tm 0 0.
+
+Definition tm_assn_ok {m} (γ : tm_assn m) (η : candidate_assn m) :=
+  forall i, (η i) (γ i).
