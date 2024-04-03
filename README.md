@@ -7,6 +7,15 @@ Some differences from the notes:
 - Renaming and substitution properties for both syntactic and semantic typing are formulated in the general form of simultaneous substitution/renaming.
 - The definition of a candidate (`candidate`) is independent of the choice of types or the type assignment ($\delta$). The type assignment is only used to close over an open term to define semantic typing.
 
+I also added a proof irrelevant model in [proofirrel.v](proofirrel.v),
+where types are interpreted as Coq propositions rather than sets of
+terms encoded as Coq predicates. With the current minimal set up of
+the system, the proof irrelevant model is not very useful. However, it
+allows you to treat System F purely as a logic and add axioms such as
+law-of-excluded middle, which would then break the proof relevant
+model because you can get stuck from the usages of the axiom.
+
+
 ## Dependencies
 To build the project, you need to have the following opam packages installed:
 - `coq-mathcomp-ssreflect` 1.17.0
